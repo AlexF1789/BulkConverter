@@ -1,4 +1,6 @@
-﻿Imports System.Collections.Concurrent
+﻿Option Strict On
+
+Imports System.Collections.Concurrent
 Imports System.IO
 Imports System.Threading
 
@@ -13,27 +15,15 @@ Namespace Converter
         Private OutputCodec As String
         Private Extension As String
 
-        Public Sub New(files As ICollection(Of String), outputCodec As String, extension As String, ProcessorCount As Integer?)
+        Public Sub New(files As ICollection(Of String), outputCodec As String, extension As String, processorCount As Integer)
             CompletedFiles = 0
             ErrorList = New ConcurrentBag(Of FileError)()
 
             Me.Extension = extension
             Me.OutputCodec = outputCodec
+            Me.ProcessorCount = processorCount
 
             AllocateQueue(files)
-
-            ' if the user specified the processor count for the operation let's include it
-            ' otherwise let's use the system number
-            If ProcessorCount Is Nothing Then
-                Me.ProcessorCount = Environment.ProcessorCount
-            Else
-                Me.ProcessorCount = ProcessorCount
-            End If
-        End Sub
-
-        Public Sub New(files As ICollection(Of String), outputCodec As String, extension As String)
-            ' let's call the canonical constructor by passing Nothing as the processor count parameter
-            Me.New(files, outputCodec, extension, Nothing)
         End Sub
 
         Public Sub Start()
@@ -49,28 +39,34 @@ Namespace Converter
             ' let's extract an element from the queue
             Dim currentFile As String = Nothing
 
+            ' let's grab a file from the queue (if there are still)
             While InputFiles.TryDequeue(currentFile)
 
+                ' let's extract the file name that we'll later use for the output
                 Dim fileName As String = Path.GetFileNameWithoutExtension(currentFile)
 
+                ' let's define the process options, start the process and save the error output
                 Dim processOptions As New ProcessStartInfo With {
                     .FileName = "ffmpeg",
-                    .Arguments = $"-vn -c:a {OutputCodec} {fileName}.{Extension}",
+                    .Arguments = $"-i ""{currentFile}"" -vn -c:a {OutputCodec} ""{fileName}.{Extension}""",
                     .UseShellExecute = False,
                     .CreateNoWindow = True,
                     .RedirectStandardError = True
                 }
 
                 Dim process As Process = Process.Start(processOptions)
+                Dim errorOutput As String = process.StandardError.ReadToEnd()
                 process.WaitForExit()
 
+                ' if the process ended gracefully everything's fine, otherwise we'll save the error in the list
                 If process.ExitCode <> 0 Then
-                    Console.WriteLine($"Conversion of {currentFile} failed!")
-                    ErrorList.Add(New FileError(currentFile, process.StandardError.ReadToEnd()))
+                    Console.WriteLine($"[{processorId + 1}/{ProcessorCount}]: Conversion of {fileName} failed!")
+                    ErrorList.Add(New FileError(currentFile, errorOutput))
                 Else
-                    Console.WriteLine($"Conversion of {currentFile} completed!")
+                    Console.WriteLine($"[{processorId + 1}/{ProcessorCount}]: Conversion of {fileName} completed!")
                 End If
 
+                ' let's update in a thread safe way the completed files counter
                 Interlocked.Increment(CompletedFiles)
 
             End While
@@ -117,7 +113,7 @@ Namespace Converter
 
         End Sub
 
-        Private Function GetErrors() As List(Of FileError)
+        Public Function GetErrors() As List(Of FileError)
             Return New List(Of FileError)(ErrorList)
         End Function
 

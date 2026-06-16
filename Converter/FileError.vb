@@ -1,4 +1,6 @@
-﻿Namespace Converter
+﻿Option Strict On
+
+Namespace Converter
 
     Public Class FileError
 
