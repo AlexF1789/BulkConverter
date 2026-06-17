@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <RootNamespace>FFmpegConverter</RootNamespace>
+    <RootNamespace>BulkConverter</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 

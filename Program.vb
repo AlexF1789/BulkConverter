@@ -1,6 +1,6 @@
 Option Strict On
 
-Imports FFmpegConverter.Converter
+Imports BulkConverter.Converter
 
 Module Program
 
